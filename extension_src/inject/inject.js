@@ -723,8 +723,9 @@ if (window[extensionContainerId]) {
         container.className = "rs-chrome-container";
         container.style.display = "none";
         container.onmousedown = startDrag;
-        window.onresize = () =>
-          moveTo(container.offsetTop, container.offsetLeft);
+        window.addEventListener("resize", () =>
+          moveTo(container.offsetTop, container.offsetLeft)
+        );
         shadowRoot.appendChild(container);
 
         let headline = document.createElement("div");
@@ -982,29 +983,32 @@ if (window[extensionContainerId]) {
           const token = await fetchToken();
 
           let imageId;
-          try {
-            const imageResponse = await fetch(currentSnip.imageURL);
-            const imageBlob = await imageResponse.blob();
+          if (currentSnip.imageURL) {
+            try {
+              const imageResponse = await fetch(currentSnip.imageURL);
+              const imageBlob = await imageResponse.blob();
 
-            const formData = new FormData();
-            formData.append("image", imageBlob);
+              const formData = new FormData();
+              formData.append("image", imageBlob);
 
-            const imageCreateResponse = await fetch(
-              `https://api.recipesage.com/images?token=${token}`,
-              {
-                method: "POST",
-                body: formData,
+              const imageCreateResponse = await fetch(
+                `https://api.recipesage.com/images?token=${token}`,
+                {
+                  method: "POST",
+                  body: formData,
+                }
+              );
+
+              if (imageCreateResponse.ok) {
+                const imageData = await imageCreateResponse.json();
+                imageId = imageData.id;
               }
-            );
-
-            if (!imageCreateResponse.ok) return;
-
-            const imageData = await imageCreateResponse.json();
-
-            imageId = imageData.id;
-          } catch (e) {
-            console.error("Error creating image", e);
+            } catch (e) {
+              console.error("Error creating image", e);
+            }
           }
+
+          const { imageURL, ...recipeSnip } = currentSnip;
 
           const recipeCreateResponse = await fetch(
             `https://api.recipesage.com/recipes?token=${token}`,
@@ -1014,7 +1018,7 @@ if (window[extensionContainerId]) {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                ...currentSnip,
+                ...recipeSnip,
                 imageIds: imageId ? [imageId] : [],
               }),
             }

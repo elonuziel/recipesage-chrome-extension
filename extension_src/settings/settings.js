@@ -8,7 +8,13 @@ chrome.storage.local.get(["token"], async (result) => {
         `https://api.recipesage.com/users?token=${result.token}`
       );
       if (!response.ok) {
-        loggedOutMessage.style.display = "block";
+        if (response.status === 401) {
+          chrome.storage.local.set({ token: null });
+          alert("Your session has expired. Please log in again.");
+          loggedOutMessage.style.display = "block";
+        } else {
+          loggedOutMessage.style.display = "block";
+        }
         return;
       }
       const data = await response.json();

@@ -2,7 +2,6 @@ const API_BASE = "https://api.recipesage.com/";
 
 chrome.runtime.onMessage.addListener((request) => {
   const clipData = request;
-  console.log(clipData);
 
   saveClip(clipData);
 });
@@ -27,12 +26,12 @@ const login = async () => {
 
     if (!loginResponse.ok) {
       switch (loginResponse.status) {
-        case 412:
-          document.getElementById("message").innerText =
+        case 401:
+          document.getElementById("login-message").innerText =
             "It looks like that email or password isn't correct.";
           break;
         default:
-          document.getElementById("message").innerText =
+          document.getElementById("login-message").innerText =
             "Something went wrong. Please try again.";
           break;
       }
@@ -45,7 +44,7 @@ const login = async () => {
     chrome.storage.local.set({ token }, () => {
       chrome.storage.local.get(["seenTutorial"], (result) => {
         if (result.seenTutorial) {
-          document.getElementById("message").innerText =
+          document.getElementById("login-message").innerText =
             "You are now logged in. Click the RecipeSage icon again to clip this website.";
           setTimeout(() => {
             window.close();
@@ -56,12 +55,13 @@ const login = async () => {
       });
     });
   } catch (e) {
-    document.getElementById("message").innerText =
+    document.getElementById("login-message").innerText =
       "Something went wrong. Please check your internet connection and try again.";
   }
 };
 
 const showTutorial = () => {
+  document.getElementsByTagName("html")[0].style.display = "initial";
   document.getElementById("login").style.display = "none";
   document.getElementById("tutorial").style.display = "block";
   document.getElementById("importing").style.display = "none";
@@ -109,14 +109,18 @@ const createImageFromBlob = async (imageBlob) => {
 };
 
 const interactiveClip = async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-  await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    files: ["/inject/inject.js"],
-  });
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["/inject/inject.js"],
+    });
 
-  window.close();
+    window.close();
+  } catch (e) {
+    window.alert("Failed to open the interactive clip tool. Please try again.");
+  }
 };
 
 const autoClip = async () => {
@@ -129,6 +133,7 @@ const autoClip = async () => {
       await clipWithAPI();
     } catch (e) {
       window.alert("Failed to fetch page content");
+      showStart();
     }
   }
 };
@@ -163,8 +168,7 @@ const clipWithAPI = async () => {
   });
 
   if (!clipResponse.ok) {
-    showStart();
-    return window.alert(
+    throw new Error(
       "Failed to clip recipe. If this continues, please report a bug"
     );
   }
@@ -186,6 +190,8 @@ const saveClip = async (clipData) => {
     }
   }
 
+  const { imageBase64, imageURL, ...recipeFields } = clipData;
+
   const recipeCreateResponse = await fetch(
     `${API_BASE}recipes?token=${token}`,
     {
@@ -196,7 +202,7 @@ const saveClip = async (clipData) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        ...clipData,
+        ...recipeFields,
         imageIds: imageId ? [imageId] : [],
       }),
     }
@@ -211,6 +217,7 @@ const saveClip = async (clipData) => {
           window.alert(
             "Please Login. It looks like you're logged out. Please click the RecipeSage icon to login again."
           );
+          showLogin();
         });
         break;
       default:
@@ -218,6 +225,7 @@ const saveClip = async (clipData) => {
         window.alert(
           "Could Not Save Recipe. An error occurred while saving the recipe. Please try again."
         );
+        showStart();
         break;
     }
     return;
@@ -247,7 +255,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("password").onkeydown = (event) => {
     if (event.key === "Enter") login();
   };
-  document.getElementById("tutorial-submit").onclick = () => window.close();
+  document.getElementById("tutorial-submit").onclick = () => {
+    chrome.storage.local.set({ seenTutorial: true }, () => {
+      window.close();
+    });
+  };
   document.getElementById("auto-import").onclick = autoClip;
   document.getElementById("interactive-import").onclick = interactiveClip;
 
