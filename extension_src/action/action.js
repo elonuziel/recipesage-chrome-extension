@@ -243,7 +243,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("password").onkeydown = (event) => {
     if (event.key === "Enter") login();
   };
-  document.getElementById("tutorial-submit").onclick = () => window.close();
+  document.getElementById("tutorial-submit").onclick = () => {
+    chrome.storage.local.set({ seenTutorial: true }, () => {
+      window.close();
+    });
+  };
   document.getElementById("auto-import").onclick = autoClip;
   document.getElementById("interactive-import").onclick = interactiveClip;
 

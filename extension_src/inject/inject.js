@@ -997,11 +997,10 @@ if (window[extensionContainerId]) {
               }
             );
 
-            if (!imageCreateResponse.ok) return;
-
-            const imageData = await imageCreateResponse.json();
-
-            imageId = imageData.id;
+            if (imageCreateResponse.ok) {
+              const imageData = await imageCreateResponse.json();
+              imageId = imageData.id;
+            }
           } catch (e) {
             console.error("Error creating image", e);
           }

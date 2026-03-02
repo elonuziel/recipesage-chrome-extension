@@ -562,7 +562,10 @@ chrome.storage.local.get(["token"], async (result) => {
 
   const clip = await RecipeClipper.clipRecipe().catch(() => {
     alert("Error while attempting to automatically clip recipe from page");
+    return null;
   });
+
+  if (!clip) return;
 
   clip.url = window.location.href;
 
@@ -570,21 +573,23 @@ chrome.storage.local.get(["token"], async (result) => {
     try {
       const imageBlobResponse = await fetch(clip.imageURL);
 
-      if (!imageBlobResponse.ok) return;
+      if (!imageBlobResponse.ok) {
+        console.error("Image fetch failed for URL " + clip.imageURL + " with status " + imageBlobResponse.status);
+      } else {
+        const imageBlob = await imageBlobResponse.blob();
 
-      const imageBlob = await imageBlobResponse.blob();
-
-      clip.imageBase64 = await new Promise((success, error) => {
-        try {
-          const reader = new FileReader();
-          reader.onload = function () {
-            success(this.result);
-          };
-          reader.readAsDataURL(imageBlob);
-        } catch (e) {
-          error(e);
-        }
-      });
+        clip.imageBase64 = await new Promise((success, error) => {
+          try {
+            const reader = new FileReader();
+            reader.onload = function () {
+              success(this.result);
+            };
+            reader.readAsDataURL(imageBlob);
+          } catch (e) {
+            error(e);
+          }
+        });
+      }
     } catch (e) {
       console.error(e);
     }
