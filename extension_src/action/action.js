@@ -212,6 +212,8 @@ const saveClip = async (clipData) => {
     switch (recipeCreateResponse.status) {
       case 401:
         chrome.storage.local.set({ token: null }, () => {
+          token = null;
+          showLogin();
           window.alert(
             "Please Login. It looks like you're logged out. Please click the RecipeSage icon to login again."
           );
@@ -219,6 +221,7 @@ const saveClip = async (clipData) => {
         });
         break;
       default:
+        showStart();
         window.alert(
           "Could Not Save Recipe. An error occurred while saving the recipe. Please try again."
         );
