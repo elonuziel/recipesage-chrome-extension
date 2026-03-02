@@ -40,7 +40,7 @@ const login = async () => {
     }
 
     const data = await loginResponse.json();
-    const { token } = data;
+    token = data.token;
 
     chrome.storage.local.set({ token }, () => {
       chrome.storage.local.get(["seenTutorial"], (result) => {
@@ -163,6 +163,7 @@ const clipWithAPI = async () => {
   });
 
   if (!clipResponse.ok) {
+    showStart();
     return window.alert(
       "Failed to clip recipe. If this continues, please report a bug"
     );
@@ -205,12 +206,15 @@ const saveClip = async (clipData) => {
     switch (recipeCreateResponse.status) {
       case 401:
         chrome.storage.local.set({ token: null }, () => {
+          token = null;
+          showLogin();
           window.alert(
             "Please Login. It looks like you're logged out. Please click the RecipeSage icon to login again."
           );
         });
         break;
       default:
+        showStart();
         window.alert(
           "Could Not Save Recipe. An error occurred while saving the recipe. Please try again."
         );
