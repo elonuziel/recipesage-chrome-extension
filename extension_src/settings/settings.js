@@ -9,7 +9,9 @@ chrome.storage.local.get(["token"], async (result) => {
       );
       if (!response.ok) {
         if (response.status === 401) {
+          chrome.storage.local.set({ token: null });
           alert("Your session has expired. Please log in again.");
+          loggedOutMessage.style.display = "block";
         } else {
           loggedOutMessage.style.display = "block";
         }
