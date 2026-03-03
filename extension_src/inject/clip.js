@@ -560,12 +560,15 @@ chrome.storage.local.get(["token"], async (result) => {
     "https://api.recipesage.com/proxy/ingredient-instruction-classifier?token=" +
     result.token;
 
-  const clip = await RecipeClipper.clipRecipe().catch(() => {
-    alert("Error while attempting to automatically clip recipe from page");
+  const clip = await RecipeClipper.clipRecipe().catch((e) => {
+    console.error("Error clipping recipe", e);
     return null;
   });
 
-  if (!clip) return;
+  if (!clip) {
+    chrome.runtime.sendMessage({ error: "Failed to clip recipe" });
+    return;
+  }
 
   clip.url = window.location.href;
 

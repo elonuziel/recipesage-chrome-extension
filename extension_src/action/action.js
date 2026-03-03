@@ -1,6 +1,15 @@
 const API_BASE = "https://api.recipesage.com/";
 
 chrome.runtime.onMessage.addListener((request) => {
+  if (request.error) {
+    clipWithAPI().catch((e) => {
+      console.error(e);
+      window.alert("Failed to fetch page content");
+      showStart();
+    });
+    return;
+  }
+
   const clipData = request;
 
   saveClip(clipData);
@@ -217,7 +226,6 @@ const saveClip = async (clipData) => {
           window.alert(
             "Please Login. It looks like you're logged out. Please click the RecipeSage icon to login again."
           );
-          showLogin();
         });
         break;
       default:
