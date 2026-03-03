@@ -136,10 +136,10 @@ const autoClip = async () => {
   showLoading();
 
   try {
-    await clipWithAPI();
+    await clipWithInject();
   } catch (e) {
     try {
-      await clipWithInject();
+      await clipWithAPI();
     } catch (e) {
       window.alert("Failed to fetch page content");
       showStart();
