@@ -136,10 +136,10 @@ const autoClip = async () => {
   showLoading();
 
   try {
-    await clipWithInject();
+    await clipWithAPI();
   } catch (e) {
     try {
-      await clipWithAPI();
+      await clipWithInject();
     } catch (e) {
       window.alert("Failed to fetch page content");
       showStart();
@@ -255,9 +255,9 @@ const saveClip = async (clipData) => {
 document.addEventListener("DOMContentLoaded", () => {
   [...document.getElementsByClassName("logo")].forEach(
     (logo) =>
-      (logo.src = chrome.runtime.getURL(
-        "./images/recipesage-black-trimmed.png"
-      ))
+    (logo.src = chrome.runtime.getURL(
+      "./images/recipesage-black-trimmed.png"
+    ))
   );
   document.getElementById("login-submit").onclick = login;
   document.getElementById("password").onkeydown = (event) => {

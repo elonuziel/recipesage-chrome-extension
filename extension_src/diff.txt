@@ -1,0 +1,51 @@
+diff --git a/extension_src/action/action.js b/extension_src/action/action.js
+index 5a39aba..696b1c0 100644
+--- a/extension_src/action/action.js
++++ b/extension_src/action/action.js
+@@ -1,6 +1,15 @@
+ const API_BASE = "https://api.recipesage.com/";
+ 
+ chrome.runtime.onMessage.addListener((request) => {
++  if (request.error) {
++    clipWithAPI().catch((e) => {
++      console.error(e);
++      window.alert("Failed to fetch page content");
++      showStart();
++    });
++    return;
++  }
++
+   const clipData = request;
+ 
+   saveClip(clipData);
+@@ -217,7 +226,6 @@ const saveClip = async (clipData) => {
+           window.alert(
+             "Please Login. It looks like you're logged out. Please click the RecipeSage icon to login again."
+           );
+-          showLogin();
+         });
+         break;
+       default:
+diff --git a/extension_src/inject/clip.js b/extension_src/inject/clip.js
+index 2aaee45..40399df 100644
+--- a/extension_src/inject/clip.js
++++ b/extension_src/inject/clip.js
+@@ -560,12 +560,15 @@ chrome.storage.local.get(["token"], async (result) => {
+     "https://api.recipesage.com/proxy/ingredient-instruction-classifier?token=" +
+     result.token;
+ 
+-  const clip = await RecipeClipper.clipRecipe().catch(() => {
+-    alert("Error while attempting to automatically clip recipe from page");
++  const clip = await RecipeClipper.clipRecipe().catch((e) => {
++    console.error("Error clipping recipe", e);
+     return null;
+   });
+ 
+-  if (!clip) return;
++  if (!clip) {
++    chrome.runtime.sendMessage({ error: "Failed to clip recipe" });
++    return;
++  }
+ 
+   clip.url = window.location.href;
+ 
