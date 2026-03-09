@@ -69,6 +69,7 @@ jobs:
       - name: Pack extension
         env:
           EXTENSION_PEM: ${{ secrets.EXTENSION_PEM }}
+          NODE_OPTIONS: --openssl-legacy-provider
         run: |
           echo "$EXTENSION_PEM" > temp.pem
           crx pack extension_src -p temp.pem -o recipesage.crx
