@@ -47,23 +47,24 @@
             return config;
           };
 
-          const generalBadWords = ['instructions', 'directions', 'procedure', 'preparation', 'method', 'you will need', 'how to make it', 'ingredients', 'total time', 'active time', 'prep time', 'time', 'yield', 'servings', 'notes', 'select all ingredients', 'select all'];
+          const generalBadWords = ['instructions', 'directions', 'procedure', 'preparation', 'method', 'you will need', 'how to make it', 'ingredients', 'total time', 'active time', 'prep time', 'time', 'yield', 'servings', 'notes', 'select all ingredients', 'select all', 'הוראות', 'אופן הכנה', 'מצרכים', 'חומרים', 'בחר הכל', 'הדפס'];
           const allRecipesBadWords = ['ingredient checklist', 'instructions checklist', 'decrease serving', 'increase serving', 'adjust', 'the ingredient list now reflects the servings specified', 'footnotes', 'i made it  print', 'add all ingredients to shopping list'];
           const tastyRecipesBadWords = ['scale 1x2x3x'];
-          const badWords = [generalBadWords, allRecipesBadWords, tastyRecipesBadWords].flat();
+          const hebrewBadWords = ['הוראות הכנה', 'אופן ההכנה', 'רכיבים', 'זמן ההכנה'];
+          const badWords = [generalBadWords, allRecipesBadWords, tastyRecipesBadWords, hebrewBadWords].flat();
 
-          const matchYield = /(serves|servings|yield|yields|makes):?\s*\d+/i;
-          const matchActiveTime = /(active time|prep time):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?))? ?(and)? ?)+/i;
-          const matchTotalTime = /(total time):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?))? ?(and)? ?)+/i; // step 4:
+          const matchYield = /(serves|servings|yield|yields|makes|מנות|יחידות|כמות):?\s*\d+/i;
+          const matchActiveTime = /(active time|prep time|זמן הכנה|זמן עבודה):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?)|דקות|שעות|ימים)? ?(and|ו)? ?)+/i;
+          const matchTotalTime = /(total time|זמן כולל|זמן אפייה):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?)|דקות|שעות|ימים)? ?(and|ו)? ?)+/i; // step 4:
 
           const matchStep = /^(step *)?\d+:?$/i; // 1x, 1 x
 
           const matchScale = /^\d+ *x?$/i; // total time:
 
-          const matchFieldTitles = /^(total time|prep time|active time|yield|servings|serves):? ?/i;
-          const matchSpecialChracters = /[^a-zA-Z0-9 ]/g;
-          const ingredientSectionHeader = /^(ingredients|you will need|ingredient checklist|ingredient list)\s*:?/gi;
-          const instructionSectionHeader = /^(instructions|instructions checklist|instruction list|how to make it|preparation|steps|method|procedure|directions)\s*:?/gi;
+          const matchFieldTitles = /^(total time|prep time|active time|yield|servings|serves|זמן כולל|זמן הכנה|זמן אפייה|זמן עבודה|מנות|יחידות|כמות):? ?/i;
+          const matchSpecialChracters = /[^a-zA-Z0-9 \u0590-\u05FF\u200f\u200e]/g;
+          const ingredientSectionHeader = /^(ingredients|you will need|ingredient checklist|ingredient list|מצרכים|חומרים|רכיבים|מה צריך)\s*:?/gi;
+          const instructionSectionHeader = /^(instructions|instructions checklist|instruction list|how to make it|preparation|steps|method|procedure|directions|הוראות|אופן הכנה|אופן ההכנה|הוראות הכנה|שלבי הכנה|שלבים)\s*:?/gi;
 
           const getLongestString = strings => strings.reduce((acc, el) => el.length > acc.length ? el : acc, '');
           const capitalizeEachWord = textBlock => textBlock.split(' ').map(word => `${word.charAt(0).toUpperCase()}${word.substring(1)}`).join(' ');
@@ -229,7 +230,7 @@
               'directions', // Generic
               'instructions', // Generic
               'mntl-sc-block-instruction', 'recipe-directions__step', 'recipe-method__list', 'instruction-step', 'directions-list', 'instructions-list' // Modern additions
-            ], ['instructionlist', 'instruction-list', 'preparationsteps', 'preparation-steps', 'directionlist', 'direction-list', 'recipesteps', 'recipe-steps', 'recipemethod', 'recipe-method', 'directions', 'instructions', 'mntl-sc-block-instruction', 'recipe-directions__step', 'recipe-method__list', 'instruction-step', 'directions-list', 'instructions-list']],
+            ], ['directionlist', 'direction-list', 'recipesteps', 'recipe-steps', 'recipemethod', 'recipe-method', 'directions', 'instructions', 'mntl-sc-block-instruction', 'recipe-directions__step', 'recipe-method__list', 'instruction-step', 'directions-list', 'instructions-list', 'instructions', 'preparationsteps']],
             notes: [['notes', // Generic
               'recipenotes', // Generic
               'recipe-notes', // Generic
@@ -564,55 +565,70 @@
   /************************************************************************/
   var __webpack_exports__ = {};
   // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
-  (() => {
+  (async () => {
     const RecipeClipper = __webpack_require__(92);
 
-    chrome.storage.local.get(["token"], async (result) => {
-      window.RC_ML_CLASSIFY_ENDPOINT =
-        "https://api.recipesage.com/proxy/ingredient-instruction-classifier?token=" +
-        result.token;
-
-      const clip = await RecipeClipper.clipRecipe().catch((e) => {
-        console.error("Error clipping recipe", e);
-        return null;
+    async function getStorage(keys) {
+      return new Promise((resolve) => {
+        chrome.storage.local.get(keys, resolve);
       });
+    }
 
-      if (!clip) {
-        chrome.runtime.sendMessage({ error: "Failed to clip recipe" });
-        return;
-      }
+    let token = null;
+    try {
+      const result = await getStorage(["token"]);
+      token = result ? result.token : null;
+    } catch (e) {
+      console.error("Error retrieving token from storage", e);
+    }
 
-      clip.url = window.location.href;
+    const options = {};
+    if (token) {
+      options.mlClassifyEndpoint = "https://api.recipesage.com/proxy/ingredient-instruction-classifier?token=" + token;
+    }
 
-      if (clip.imageURL?.trim()) {
-        try {
-          const imageBlobResponse = await fetch(clip.imageURL);
-
-          if (!imageBlobResponse.ok) {
-            console.error("Image fetch failed for URL " + clip.imageURL + " with status " + imageBlobResponse.status);
-          } else {
-            const imageBlob = await imageBlobResponse.blob();
-
-            clip.imageBase64 = await new Promise((success, error) => {
-              try {
-                const reader = new FileReader();
-                reader.onload = function () {
-                  success(this.result);
-                };
-                reader.readAsDataURL(imageBlob);
-              } catch (e) {
-                error(e);
-              }
-            });
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      chrome.runtime.sendMessage(clip);
+    const clip = await RecipeClipper.clipRecipe(options).catch((e) => {
+      console.error("Error clipping recipe", e);
+      return null;
     });
 
+    if (!clip) {
+      chrome.runtime.sendMessage({ error: "Failed to clip recipe" });
+      return;
+    }
+
+    clip.url = window.location.href;
+
+    if (clip.imageURL?.trim()) {
+      try {
+        const imageBlobResponse = await fetch(clip.imageURL);
+
+        if (!imageBlobResponse.ok) {
+          console.error("Image fetch failed for URL " + clip.imageURL + " with status " + imageBlobResponse.status);
+        } else {
+          const imageBlob = await imageBlobResponse.blob();
+
+          clip.imageBase64 = await new Promise((success, error) => {
+            try {
+              const reader = new FileReader();
+              reader.onload = function () {
+                success(this.result);
+              };
+              reader.onerror = function () {
+                error(reader.error);
+              };
+              reader.readAsDataURL(imageBlob);
+            } catch (e) {
+              error(e);
+            }
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    chrome.runtime.sendMessage(clip);
   })();
 
   /******/
