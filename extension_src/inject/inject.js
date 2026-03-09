@@ -685,57 +685,49 @@
             });
           };
 
-          let moveTo = (top, left) => {
-            if (left < 0) {
-              container.style.left = "0px";
-            } else if (left + container.offsetWidth > window.innerWidth) {
-              container.style.left = `${window.innerWidth - container.offsetWidth
-                }px`;
-            } else {
-              container.style.left = `${left}px`;
-            }
+          let isDragging = false;
+          let currentX = 0;
+          let currentY = 0;
+          let initialX = 0;
+          let initialY = 0;
+          let xOffset = 0;
+          let yOffset = 0;
 
-            if (top < 0) {
-              container.style.top = "0px";
-            } else if (top + container.offsetHeight > window.innerHeight) {
-              container.style.top = `${window.innerHeight - container.offsetHeight
-                }px`;
-            } else {
-              container.style.top = `${top}px`;
-            }
+          let moveTo = (x, y) => {
+            container.style.transform = `translate3d(${x}px, ${y}px, 0)`;
           };
 
-          let pos = {};
           let moveDrag = (e) => {
-            let diffX = e.clientX - pos.lastX;
-            let diffY = e.clientY - pos.lastY;
+            if (isDragging) {
+              e.preventDefault();
+              currentX = e.clientX - initialX;
+              currentY = e.clientY - initialY;
 
-            moveTo(container.offsetTop + diffY, container.offsetLeft + diffX);
+              xOffset = currentX;
+              yOffset = currentY;
 
-            pos.lastX = e.clientX;
-            pos.lastY = e.clientY;
+              moveTo(currentX, currentY);
+            }
           };
 
           let stopDrag = () => {
+            isDragging = false;
             window.removeEventListener("mouseup", stopDrag);
             window.removeEventListener("mousemove", moveDrag);
           };
 
           let startDrag = (e) => {
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+            isDragging = true;
             window.addEventListener("mouseup", stopDrag);
             window.addEventListener("mousemove", moveDrag);
-            pos.lastX = e.clientX;
-            pos.lastY = e.clientY;
           };
 
           let init = () => {
             container = document.createElement("div");
             container.className = "rs-chrome-container";
             container.style.display = "none";
-            container.onmousedown = startDrag;
-            window.addEventListener("resize", () =>
-              moveTo(container.offsetTop, container.offsetLeft)
-            );
             shadowRoot.appendChild(container);
 
             let headline = document.createElement("div");
@@ -744,6 +736,7 @@
 
             let leftHeadline = document.createElement("div");
             leftHeadline.className = "headline-left";
+            leftHeadline.onmousedown = startDrag;
             headline.appendChild(leftHeadline);
 
             let moveButton = document.createElement("i");
