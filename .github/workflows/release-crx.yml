@@ -98,14 +98,7 @@ jobs:
           else
             # Build the prompt
             PROMPT_FILE=".changelog-prompt.txt"
-            cat > "$PROMPT_FILE" << 'PROMPTEOF'
-            You are a helpful assistant that generates clean release notes.
-            Summarize the following git commits into a clean, readable changelog
-            (3-5 bullet points) focusing on user-facing features and bug fixes.
-            Ignore version bumps and obscure chore commits.
-            Do not add markdown headers like Changelog.
-
-            PROMPTEOF
+            printf "You are a helpful assistant that generates clean release notes.\nSummarize the following git commits into a clean, readable changelog\n(3-5 bullet points) focusing on user-facing features and bug fixes.\nIgnore version bumps and obscure chore commits.\nDo not add markdown headers like Changelog.\n\n" > "$PROMPT_FILE"
             echo "$COMMITS" >> "$PROMPT_FILE"
 
             # Build JSON payload safely using jq
