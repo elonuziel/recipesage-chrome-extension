@@ -275,16 +275,26 @@
           const mlClassifyRemote = async (config, lines) => {
             const remote = config.options.mlClassifyEndpoint;
             if (!remote) throw new Error('You must provide window.RC_ML_CLASSIFY_ENDPOINT or options.mlClassifyEndpoint to use remote classification');
-            const response = await config.window.fetch(remote, {
-              method: 'POST',
-              body: JSON.stringify({
-                sentences: lines
-              }),
-              headers: {
-                'Content-Type': 'application/json'
-              }
+            return new Promise((resolve, reject) => {
+              chrome.runtime.sendMessage(
+                {
+                  type: "FETCH_API",
+                  url: remote,
+                  options: {
+                    method: 'POST',
+                    body: JSON.stringify({ sentences: lines }),
+                    headers: { 'Content-Type': 'application/json' }
+                  }
+                },
+                (response) => {
+                  if (response && response.success) {
+                    resolve(response.data);
+                  } else {
+                    reject(new Error(response?.error || 'Failed to fetch from background'));
+                  }
+                }
+              );
             });
-            return response.json();
           };
           const mlClassify = async (config, lines) => {
             const isTFJSAvailable = config.window.tf && config.window.tf.loadLayersModel;
@@ -633,7 +643,7 @@
     });
 
     if (!clip) {
-      chrome.runtime.sendMessage({ error: "Failed to clip recipe" });
+      chrome.runtime.sendMessage({ type: "CLIP_ERROR", error: "Failed to clip recipe" });
       return;
     }
 
@@ -641,34 +651,22 @@
 
     if (clip.imageURL?.trim()) {
       try {
-        const imageBlobResponse = await fetch(clip.imageURL);
-
-        if (!imageBlobResponse.ok) {
-          console.error("Image fetch failed for URL " + clip.imageURL + " with status " + imageBlobResponse.status);
-        } else {
-          const imageBlob = await imageBlobResponse.blob();
-
-          clip.imageBase64 = await new Promise((success, error) => {
-            try {
-              const reader = new FileReader();
-              reader.onload = function () {
-                success(this.result);
-              };
-              reader.onerror = function () {
-                error(reader.error);
-              };
-              reader.readAsDataURL(imageBlob);
-            } catch (e) {
-              error(e);
+        const response = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ type: "FETCH_IMAGEAsBase64", url: clip.imageURL }, (res) => {
+            if (res && res.success) {
+              resolve(res.base64);
+            } else {
+              reject(new Error(res?.error || "Image fetch failed"));
             }
           });
-        }
+        });
+        clip.imageBase64 = response;
       } catch (e) {
         console.error(e);
       }
     }
 
-    chrome.runtime.sendMessage(clip);
+    chrome.runtime.sendMessage({ type: "CLIP_SUCCESS", data: clip });
   })();
 
   /******/

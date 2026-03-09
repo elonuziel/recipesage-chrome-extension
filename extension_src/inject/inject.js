@@ -275,16 +275,26 @@
           const mlClassifyRemote = async (config, lines) => {
             const remote = config.options.mlClassifyEndpoint;
             if (!remote) throw new Error('You must provide window.RC_ML_CLASSIFY_ENDPOINT or options.mlClassifyEndpoint to use remote classification');
-            const response = await config.window.fetch(remote, {
-              method: 'POST',
-              body: JSON.stringify({
-                sentences: lines
-              }),
-              headers: {
-                'Content-Type': 'application/json'
-              }
+            return new Promise((resolve, reject) => {
+              chrome.runtime.sendMessage(
+                {
+                  type: "FETCH_API",
+                  url: remote,
+                  options: {
+                    method: 'POST',
+                    body: JSON.stringify({ sentences: lines }),
+                    headers: { 'Content-Type': 'application/json' }
+                  }
+                },
+                (response) => {
+                  if (response && response.success) {
+                    resolve(response.data);
+                  } else {
+                    reject(new Error(response?.error || 'Failed to fetch from background'));
+                  }
+                }
+              );
             });
-            return response.json();
           };
           const mlClassify = async (config, lines) => {
             const isTFJSAvailable = config.window.tf && config.window.tf.loadLayersModel;
@@ -649,7 +659,7 @@
       shadowRoot.appendChild(styles);
 
       let ionIcons = document.createElement("link");
-      ionIcons.href = "https://unpkg.com/ionicons@4.5.5/dist/css/ionicons.min.css";
+      ionIcons.href = chrome.runtime.getURL("inject/ionicons.min.css");
       ionIcons.rel = "stylesheet";
       ionIcons.type = "text/css";
       document.head.appendChild(ionIcons);
@@ -1035,24 +1045,19 @@
               let imageId;
               if (currentSnip.imageURL) {
                 try {
-                  const imageResponse = await fetch(currentSnip.imageURL);
-                  const imageBlob = await imageResponse.blob();
-
-                  const formData = new FormData();
-                  formData.append("image", imageBlob);
-
-                  const imageCreateResponse = await fetch(
-                    `https://api.recipesage.com/images?token=${token}`,
-                    {
-                      method: "POST",
-                      body: formData,
-                    }
-                  );
-
-                  if (imageCreateResponse.ok) {
-                    const imageData = await imageCreateResponse.json();
-                    imageId = imageData.id;
-                  }
+                  const uploadResponse = await new Promise((resolve, reject) => {
+                    chrome.runtime.sendMessage(
+                      { type: "UPLOAD_IMAGE_FROM_URL", url: currentSnip.imageURL, token: token },
+                      (res) => {
+                        if (res && res.success) {
+                          resolve(res.data);
+                        } else {
+                          reject(new Error(res?.error || "Image upload failed"));
+                        }
+                      }
+                    );
+                  });
+                  imageId = uploadResponse.id;
                 } catch (e) {
                   console.error("Error creating image", e);
                 }
@@ -1060,19 +1065,29 @@
 
               const { imageURL, ...recipeSnip } = currentSnip;
 
-              const recipeCreateResponse = await fetch(
-                `https://api.recipesage.com/recipes?token=${token}`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
+              const recipeCreateResponse = await new Promise((resolve) => {
+                chrome.runtime.sendMessage(
+                  {
+                    type: "FETCH_API",
+                    url: `https://api.recipesage.com/recipes?token=${token}`,
+                    options: {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        ...recipeSnip,
+                        imageIds: imageId ? [imageId] : [],
+                      }),
+                    }
                   },
-                  body: JSON.stringify({
-                    ...recipeSnip,
-                    imageIds: imageId ? [imageId] : [],
-                  }),
-                }
-              );
+                  (res) => {
+                    if (res && res.success) {
+                      resolve({ ok: true, json: () => Promise.resolve(res.data) });
+                    } else {
+                      resolve({ ok: false, status: res?.status || 500 });
+                    }
+                  }
+                );
+              });
 
               if (recipeCreateResponse.ok) {
                 recipeCreateResponse.json().then((data) => {

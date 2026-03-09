@@ -22,6 +22,10 @@
     "128": "icons/icon-128x128.png"
   },
   "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "options_ui": {
     "page": "settings/settings.html",
     "open_in_tab": false
@@ -37,10 +41,16 @@
       "resources": [
         "inject/alert.css",
         "inject/clipTool.css",
+        "inject/ionicons.min.css",
         "inject/inject.js",
         "inject/clip.js",
         "icons/android-chrome-512x512.png",
-        "images/recipesage-black-trimmed.png"
+        "images/recipesage-black-trimmed.png",
+        "fonts/ionicons.eot",
+        "fonts/ionicons.woff2",
+        "fonts/ionicons.woff",
+        "fonts/ionicons.ttf",
+        "fonts/ionicons.svg"
       ],
       "matches": ["<all_urls>"]
     }

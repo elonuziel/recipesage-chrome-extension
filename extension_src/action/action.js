@@ -1,7 +1,7 @@
 const API_BASE = "https://api.recipesage.com/";
 
 chrome.runtime.onMessage.addListener((request) => {
-  if (request.error) {
+  if (request.type === "CLIP_ERROR") {
     clipWithAPI().catch((e) => {
       console.error(e);
       window.alert("Failed to fetch page content");
@@ -10,9 +10,9 @@ chrome.runtime.onMessage.addListener((request) => {
     return;
   }
 
-  const clipData = request;
-
-  saveClip(clipData);
+  if (request.type === "CLIP_SUCCESS") {
+    saveClip(request.data);
+  }
 });
 
 let token;
