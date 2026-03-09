@@ -74,7 +74,8 @@ jobs:
             echo "Error: EXTENSION_PEM secret is empty. Please check your GitHub Secrets."
             exit 1
           fi
-          node -e "fs.writeFileSync('temp.pem', process.env.EXTENSION_PEM.trim() + '\n')"
+          # Tell bash to interpret raw string, preserve newlines, and trim trailing whitespace/newlines
+          printf "%s\n" "$EXTENSION_PEM" | awk 'NF {print}' > temp.pem
           crx pack extension_src -p temp.pem -o recipesage.crx
           rm temp.pem
           
