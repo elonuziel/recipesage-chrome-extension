@@ -2,8 +2,11 @@
 *.pem
 
 # Chrome Extension Bundles
-# *.crx
+*.crx
 
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# other
+*.txt
