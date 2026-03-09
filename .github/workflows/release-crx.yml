@@ -68,18 +68,14 @@ jobs:
           
       - name: Pack extension
         env:
-          EXTENSION_PEM: ${{ secrets.EXTENSION_PEM }}
+          EXTENSION_PEM_BASE64: ${{ secrets.EXTENSION_PEM_BASE64 }}
         run: |
-          if [ -z "$EXTENSION_PEM" ]; then
-            echo "Error: EXTENSION_PEM secret is empty. Please check your GitHub Secrets."
+          if [ -z "$EXTENSION_PEM_BASE64" ]; then
+            echo "Error: EXTENSION_PEM_BASE64 secret is empty. Please check your GitHub Secrets."
             exit 1
           fi
-          # Write the PEM key, replacing literal \n sequences with actual newlines in case it was encoded as a single line
-          node -e "
-            let key = process.env.EXTENSION_PEM || '';
-            key = key.replace(/\\\\n/g, '\\n').trim();
-            require('fs').writeFileSync('temp.pem', key + '\\n');
-          "
+          # Decode the base64 secret to perfectly preserve all newlines and formatting
+          echo "$EXTENSION_PEM_BASE64" | base64 --decode > temp.pem
           crx pack extension_src -p temp.pem -o recipesage.crx
           rm temp.pem
           
