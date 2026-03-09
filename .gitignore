@@ -1,0 +1,9 @@
+# Chrome Extension Private Keys
+*.pem
+
+# Chrome Extension Bundles
+# *.crx
+
+# OS generated files
+.DS_Store
+Thumbs.db
