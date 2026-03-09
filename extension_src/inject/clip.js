@@ -494,6 +494,46 @@
           const getInstructionsFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=recipeInstructions]', '[itemProp=instructions]']);
           const getIngredientsFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=recipeIngredients]', '[itemProp=ingredients]']);
 
+          const grabByHeaderDOM = (config, type) => {
+            const headerRegexp = type === 1 ? ingredientSectionHeader : instructionSectionHeader;
+            const headers = Array.from(config.window.document.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong, div')).filter(el => {
+                 let text = getInnerText(el).trim();
+                 return text.length > 0 && text.length < 50 && text.match(headerRegexp);
+            });
+            if (headers.length === 0) return '';
+            
+            let headerElement = headers[headers.length - 1]; // Assume the last matched header is the actual recipe one
+            
+            let current = headerElement;
+            while (current && current !== config.window.document.body) {
+              let nextSibling = current.nextElementSibling;
+              
+              while (nextSibling && getInnerText(nextSibling).trim().length === 0) {
+                  nextSibling = nextSibling.nextElementSibling;
+              }
+
+              if (nextSibling) {
+                if (nextSibling.tagName === 'UL' || nextSibling.tagName === 'OL') {
+                  return getInnerText(nextSibling);
+                }
+                
+                const listInside = nextSibling.querySelector('ul, ol');
+                if (listInside) return getInnerText(listInside);
+                
+                const paragraphs = nextSibling.tagName === 'P' ? [nextSibling] : Array.from(nextSibling.querySelectorAll('p'));
+                if (paragraphs.length > 0) {
+                    let text = paragraphs.map(p => getInnerText(p).trim()).filter(t => t).join('\n');
+                    if(text) return text;
+                }
+                
+                let rawText = getInnerText(nextSibling).trim();
+                if (rawText.length > 20) return rawText;
+              }
+              current = current.parentElement;
+            }
+            return '';
+          };
+
           const clipImageURL = config => format.imageURL(getImageSrcFromSchema(config.window) || getSrcFromImage(grabLargestImage(config.window)));
           const clipTitle = config => format.title(getTitleFromSchema(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.title) || grabRecipeTitleFromDocumentTitle(config.window));
           const clipDescription = config => format.description(getDescriptionFromSchema(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.description));
@@ -501,8 +541,8 @@
           const clipYield = config => format.yield(getYieldFromSchema(config.window) || getYieldFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.yield) || closestToRegExp(config.window, matchYield).replace('\n', ''));
           const clipActiveTime = config => format.activeTime(getActiveTimeFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.activeTime) || closestToRegExp(config.window, matchActiveTime).replace('\n', ''));
           const clipTotalTime = config => format.totalTime(getTotalTimeFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.totalTime) || closestToRegExp(config.window, matchTotalTime).replace('\n', ''));
-          const clipIngredients = async config => format.ingredients(getIngredientsFromSchema(config.window) || getIngredientsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.ingredients)) || format.ingredients(await grabByMl(config, 1));
-          const clipInstructions = async config => format.instructions(getInstructionsFromSchema(config.window) || getInstructionsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.instructions)) || format.instructions(await grabByMl(config, 2));
+          const clipIngredients = async config => format.ingredients(getIngredientsFromSchema(config.window) || getIngredientsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.ingredients)) || format.ingredients(grabByHeaderDOM(config, 1)) || format.ingredients(await grabByMl(config, 1));
+          const clipInstructions = async config => format.instructions(getInstructionsFromSchema(config.window) || getInstructionsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.instructions)) || format.instructions(grabByHeaderDOM(config, 2)) || format.instructions(await grabByMl(config, 2));
           const clipNotes = config => format.notes(grabLongestMatchByClasses(config.window, ...classMatchers.notes));
 
           const clipRecipe = async options => {

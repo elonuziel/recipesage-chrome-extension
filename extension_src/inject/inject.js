@@ -47,23 +47,24 @@
             return config;
           };
 
-          const generalBadWords = ['instructions', 'directions', 'procedure', 'preparation', 'method', 'you will need', 'how to make it', 'ingredients', 'total time', 'active time', 'prep time', 'time', 'yield', 'servings', 'notes', 'select all ingredients', 'select all'];
+          const generalBadWords = ['instructions', 'directions', 'procedure', 'preparation', 'method', 'you will need', 'how to make it', 'ingredients', 'total time', 'active time', 'prep time', 'time', 'yield', 'servings', 'notes', 'select all ingredients', 'select all', 'הוראות', 'אופן הכנה', 'מצרכים', 'חומרים', 'בחר הכל', 'הדפס'];
           const allRecipesBadWords = ['ingredient checklist', 'instructions checklist', 'decrease serving', 'increase serving', 'adjust', 'the ingredient list now reflects the servings specified', 'footnotes', 'i made it  print', 'add all ingredients to shopping list'];
           const tastyRecipesBadWords = ['scale 1x2x3x'];
-          const badWords = [generalBadWords, allRecipesBadWords, tastyRecipesBadWords].flat();
+          const hebrewBadWords = ['הוראות הכנה', 'אופן ההכנה', 'רכיבים', 'זמן ההכנה'];
+          const badWords = [generalBadWords, allRecipesBadWords, tastyRecipesBadWords, hebrewBadWords].flat();
 
-          const matchYield = /(serves|servings|yield|yields|makes):?\s*\d+/i;
-          const matchActiveTime = /(active time|prep time):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?))? ?(and)? ?)+/i;
-          const matchTotalTime = /(total time):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?))? ?(and)? ?)+/i; // step 4:
+          const matchYield = /(serves|servings|yield|yields|makes|מנות|יחידות|כמות):?\s*\d+/i;
+          const matchActiveTime = /(active time|prep time|זמן הכנה|זמן עבודה):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?)|דקות|שעות|ימים)? ?(and|ו)? ?)+/i;
+          const matchTotalTime = /(total time|זמן כולל|זמן אפייה):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?)|דקות|שעות|ימים)? ?(and|ו)? ?)+/i; // step 4:
 
           const matchStep = /^(step *)?\d+:?$/i; // 1x, 1 x
 
           const matchScale = /^\d+ *x?$/i; // total time:
 
-          const matchFieldTitles = /^(total time|prep time|active time|yield|servings|serves):? ?/i;
-          const matchSpecialChracters = /[^a-zA-Z0-9 ]/g;
-          const ingredientSectionHeader = /^(ingredients|you will need|ingredient checklist|ingredient list)\s*:?/gi;
-          const instructionSectionHeader = /^(instructions|instructions checklist|instruction list|how to make it|preparation|steps|method|procedure|directions)\s*:?/gi;
+          const matchFieldTitles = /^(total time|prep time|active time|yield|servings|serves|זמן כולל|זמן הכנה|זמן אפייה|זמן עבודה|מנות|יחידות|כמות):? ?/i;
+          const matchSpecialChracters = /[^a-zA-Z0-9 \u0590-\u05FF\u200f\u200e]/g;
+          const ingredientSectionHeader = /^(ingredients|you will need|ingredient checklist|ingredient list|מצרכים|חומרים|רכיבים|מה צריך)\s*:?/gi;
+          const instructionSectionHeader = /^(instructions|instructions checklist|instruction list|how to make it|preparation|steps|method|procedure|directions|הוראות|אופן הכנה|אופן ההכנה|הוראות הכנה|שלבי הכנה|שלבים)\s*:?/gi;
 
           const getLongestString = strings => strings.reduce((acc, el) => el.length > acc.length ? el : acc, '');
           const capitalizeEachWord = textBlock => textBlock.split(' ').map(word => `${word.charAt(0).toUpperCase()}${word.substring(1)}`).join(' ');
@@ -229,7 +230,7 @@
               'directions', // Generic
               'instructions', // Generic
               'mntl-sc-block-instruction', 'recipe-directions__step', 'recipe-method__list', 'instruction-step', 'directions-list', 'instructions-list' // Modern additions
-            ], ['instructionlist', 'instruction-list', 'preparationsteps', 'preparation-steps', 'directionlist', 'direction-list', 'recipesteps', 'recipe-steps', 'recipemethod', 'recipe-method', 'directions', 'instructions', 'mntl-sc-block-instruction', 'recipe-directions__step', 'recipe-method__list', 'instruction-step', 'directions-list', 'instructions-list']],
+            ], ['directionlist', 'direction-list', 'recipesteps', 'recipe-steps', 'recipemethod', 'recipe-method', 'directions', 'instructions', 'mntl-sc-block-instruction', 'recipe-directions__step', 'recipe-method__list', 'instruction-step', 'directions-list', 'instructions-list', 'instructions', 'preparationsteps']],
             notes: [['notes', // Generic
               'recipenotes', // Generic
               'recipe-notes', // Generic
@@ -490,8 +491,47 @@
           const getActiveTimeFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=prepTime]']);
           const getTotalTimeFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=totalTime]']);
           const getYieldFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=recipeYield]']);
-          const getInstructionsFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=recipeInstructions]', '[itemProp=instructions]']);
           const getIngredientsFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=recipeIngredients]', '[itemProp=ingredients]']);
+
+          const grabByHeaderDOM = (config, type) => {
+            const headerRegexp = type === 1 ? ingredientSectionHeader : instructionSectionHeader;
+            const headers = Array.from(config.window.document.querySelectorAll('h1, h2, h3, h4, h5, h6, b, strong, div')).filter(el => {
+                 let text = getInnerText(el).trim();
+                 return text.length > 0 && text.length < 50 && text.match(headerRegexp);
+            });
+            if (headers.length === 0) return '';
+            
+            let headerElement = headers[headers.length - 1]; // Assume the last matched header is the actual recipe one
+            
+            let current = headerElement;
+            while (current && current !== config.window.document.body) {
+              let nextSibling = current.nextElementSibling;
+              
+              while (nextSibling && getInnerText(nextSibling).trim().length === 0) {
+                  nextSibling = nextSibling.nextElementSibling;
+              }
+
+              if (nextSibling) {
+                if (nextSibling.tagName === 'UL' || nextSibling.tagName === 'OL') {
+                  return getInnerText(nextSibling);
+                }
+                
+                const listInside = nextSibling.querySelector('ul, ol');
+                if (listInside) return getInnerText(listInside);
+                
+                const paragraphs = nextSibling.tagName === 'P' ? [nextSibling] : Array.from(nextSibling.querySelectorAll('p'));
+                if (paragraphs.length > 0) {
+                    let text = paragraphs.map(p => getInnerText(p).trim()).filter(t => t).join('\n');
+                    if(text) return text;
+                }
+                
+                let rawText = getInnerText(nextSibling).trim();
+                if (rawText.length > 20) return rawText;
+              }
+              current = current.parentElement;
+            }
+            return '';
+          };
 
           const clipImageURL = config => format.imageURL(getImageSrcFromSchema(config.window) || getSrcFromImage(grabLargestImage(config.window)));
           const clipTitle = config => format.title(getTitleFromSchema(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.title) || grabRecipeTitleFromDocumentTitle(config.window));
@@ -500,8 +540,8 @@
           const clipYield = config => format.yield(getYieldFromSchema(config.window) || getYieldFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.yield) || closestToRegExp(config.window, matchYield).replace('\n', ''));
           const clipActiveTime = config => format.activeTime(getActiveTimeFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.activeTime) || closestToRegExp(config.window, matchActiveTime).replace('\n', ''));
           const clipTotalTime = config => format.totalTime(getTotalTimeFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.totalTime) || closestToRegExp(config.window, matchTotalTime).replace('\n', ''));
-          const clipIngredients = async config => format.ingredients(getIngredientsFromSchema(config.window) || getIngredientsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.ingredients)) || format.ingredients(await grabByMl(config, 1));
-          const clipInstructions = async config => format.instructions(getInstructionsFromSchema(config.window) || getInstructionsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.instructions)) || format.instructions(await grabByMl(config, 2));
+          const clipIngredients = async config => format.ingredients(getIngredientsFromSchema(config.window) || getIngredientsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.ingredients)) || format.ingredients(grabByHeaderDOM(config, 1)) || format.ingredients(await grabByMl(config, 1));
+          const clipInstructions = async config => format.instructions(getInstructionsFromSchema(config.window) || getInstructionsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.instructions)) || format.instructions(grabByHeaderDOM(config, 2)) || format.instructions(await grabByMl(config, 2));
           const clipNotes = config => format.notes(grabLongestMatchByClasses(config.window, ...classMatchers.notes));
 
           const clipRecipe = async options => {
@@ -571,16 +611,23 @@
     if (window[extensionContainerId]) {
       // Looks like a popup already exists. Try to trigger it
       try {
-        window.recipeSageBrowserExtensionRootTrigger();
+        if (!document.getElementById(extensionContainerId)) {
+          // Element was detached by SPA routing, we must recreate it
+          delete window[extensionContainerId];
+        } else {
+          window.recipeSageBrowserExtensionRootTrigger();
+          return;
+        }
       } catch (e) {
         // Do nothing
       }
-    } else {
-      // At this point, we've determined that the popup does not exist
+    }
+    
+    // At this point, we've determined that the popup does not exist
 
-      window[extensionContainerId] = true; // Mark as loading so that we don't create duplicate popups
+    window[extensionContainerId] = true; // Mark as loading so that we don't create duplicate popups
 
-      console.log("Loading RecipeSage Browser Extension");
+    console.log("Loading RecipeSage Browser Extension");
 
       const fetchToken = () => {
         return new Promise((resolve) => {
@@ -1085,8 +1132,6 @@
           show();
         });
       });
-    }
-
   })();
 
   /******/
