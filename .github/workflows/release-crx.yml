@@ -1,0 +1,135 @@
+name: Create CRX Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version Bump'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write # Needed to create release and commit changes
+  models: read   # Needed for AI summary
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history for push if we bump version and for changelog
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install dependencies
+        run: npm install -g crx
+          
+      - name: Bump version in manifest.json
+        if: github.event.inputs.version_bump != 'none'
+        id: version_bump
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = './extension_src/manifest.json';
+            const manifest = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const parts = manifest.version.split('.').map(Number);
+            const bump = '${{ github.event.inputs.version_bump }}';
+            if (bump === 'major') { parts[0]++; parts[1] = 0; parts[2] = 0; }
+            else if (bump === 'minor') { parts[1]++; parts[2] = 0; }
+            else if (bump === 'patch') { parts[2]++; }
+            manifest.version = parts.join('.');
+            fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n');
+            console.log('Bumpped version to ' + manifest.version);
+          "
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add extension_src/manifest.json
+          git commit -m "Bump version [skip ci]"
+          git push
+
+      - name: Get current version
+        id: get_version
+        run: |
+          version=$(node -p "require('./extension_src/manifest.json').version")
+          echo "version=$version" >> $GITHUB_OUTPUT
+          
+      - name: Pack extension
+        env:
+          EXTENSION_PEM: ${{ secrets.EXTENSION_PEM }}
+        run: |
+          echo "$EXTENSION_PEM" > temp.pem
+          crx pack extension_src -p temp.pem -o recipesage.crx
+          rm temp.pem
+          
+      - name: Generate Changelog
+        id: changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the last release tag
+          LAST_TAG=$(git tag --sort=-version:refname | head -n 1)
+
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" "${LAST_TAG}..HEAD")
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            echo "No new commits found." > changelog.txt
+          else
+            # Build the prompt
+            PROMPT_FILE=".changelog-prompt.txt"
+            cat > "$PROMPT_FILE" << 'PROMPTEOF'
+            You are a helpful assistant that generates clean release notes.
+            Summarize the following git commits into a clean, readable changelog
+            (3-5 bullet points) focusing on user-facing features and bug fixes.
+            Ignore version bumps and obscure chore commits.
+            Do not add markdown headers like Changelog.
+
+            PROMPTEOF
+            echo "$COMMITS" >> "$PROMPT_FILE"
+
+            # Build JSON payload safely using jq
+            jq -Rs --arg model "openai/gpt-4o-mini" \
+              '{model: $model, messages: [{role: "user", content: .}]}' \
+              "$PROMPT_FILE" > .changelog-payload.json
+
+            echo "Requesting AI summary..."
+            curl -sS "https://models.github.ai/inference/chat/completions" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -d @.changelog-payload.json > .changelog-response.json
+
+            SUMMARY=$(jq -r '.choices[0].message.content // empty' .changelog-response.json)
+
+            if [ -n "$SUMMARY" ] && [ "$SUMMARY" != "null" ]; then
+                echo "$SUMMARY" > changelog.txt
+            else
+                echo "AI Summary failed, falling back to raw commits..."
+                echo "$COMMITS" > changelog.txt
+            fi
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: Release v${{ steps.get_version.outputs.version }}
+          body_path: changelog.txt
+          draft: false
+          prerelease: false
+          files: recipesage.crx
