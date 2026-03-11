@@ -54,14 +54,14 @@
           const badWords = [generalBadWords, allRecipesBadWords, tastyRecipesBadWords, hebrewBadWords].flat();
 
           const matchYield = /(serves|servings|yield|yields|makes|מנות|יחידות|כמות):?\s*\d+/i;
-          const matchActiveTime = /(active time|prep time|זמן הכנה|זמן עבודה):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?)|דקות|שעות|ימים)? ?(and|ו)? ?)+/i;
-          const matchTotalTime = /(total time|זמן כולל|זמן אפייה):?\s*(\d+ (d(s?)|day(s?)|hour(s?)|hr(s?)|minute(s?)|min(s?)|דקות|שעות|ימים)? ?(and|ו)? ?)+/i; // step 4:
+          const matchActiveTime = /(active time|prep time|זמן הכנה|זמן עבודה):?\s*((?:(?:(?:\d+(?:\.\d+|\/\d+)?|חצי|רבע)\s*(?:d(?:s?)|day(?:s?)|hour(?:s?)|hr(?:s?)|minute(?:s?)|min(?:s?)|דקות|דק'|דק|שעות|שעה|שעתיים|ימים|יום)?)|(?:d(?:s?)|day(?:s?)|hour(?:s?)|hr(?:s?)|minute(?:s?)|min(?:s?)|דקות|דק'|דק|שעות|שעה|שעתיים|ימים|יום))\s*(?:and|ו)?\s*)+/i;
+          const matchTotalTime = /(total time|זמן כולל|זמן אפייה|זמן בישול):?\s*((?:(?:(?:\d+(?:\.\d+|\/\d+)?|חצי|רבע)\s*(?:d(?:s?)|day(?:s?)|hour(?:s?)|hr(?:s?)|minute(?:s?)|min(?:s?)|דקות|דק'|דק|שעות|שעה|שעתיים|ימים|יום)?)|(?:d(?:s?)|day(?:s?)|hour(?:s?)|hr(?:s?)|minute(?:s?)|min(?:s?)|דקות|דק'|דק|שעות|שעה|שעתיים|ימים|יום))\s*(?:and|ו)?\s*)+/i; // step 4:
 
           const matchStep = /^(step *)?\d+:?$/i; // 1x, 1 x
 
           const matchScale = /^\d+ *x?$/i; // total time:
 
-          const matchFieldTitles = /^(total time|prep time|active time|yield|servings|serves|זמן כולל|זמן הכנה|זמן אפייה|זמן עבודה|מנות|יחידות|כמות):? ?/i;
+          const matchFieldTitles = /^(total time|prep time|active time|yield|servings|serves|זמן כולל|זמן הכנה|זמן אפייה|זמן בישול|זמן עבודה|מנות|יחידות|כמות):? ?/i;
           const matchSpecialChracters = /[^a-zA-Z0-9 \u0590-\u05FF\u200f\u200e]/g;
           const ingredientSectionHeader = /^(ingredients|you will need|ingredient checklist|ingredient list|מצרכים|חומרים|רכיבים|מה צריך)\s*:?/gi;
           const instructionSectionHeader = /^(instructions|instructions checklist|instruction list|how to make it|preparation|steps|method|procedure|directions|הוראות|אופן הכנה|אופן ההכנה|הוראות הכנה|שלבי הכנה|שלבים)\s*:?/gi;
@@ -494,6 +494,41 @@
             return getTextFromSchema(ingredients);
           };
 
+          // Parse ISO 8601 duration strings (e.g. "PT1H30M") into human-readable text
+          // Pass lang='he' to get Hebrew unit labels (e.g. "10 דקות" instead of "10 Minutes")
+          const parseISO8601Duration = (duration, lang) => {
+            if (!duration || typeof duration !== 'string') return '';
+            const match = duration.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/);
+            if (!match) return '';
+            const days = parseInt(match[1] || 0);
+            const hours = parseInt(match[2] || 0);
+            const minutes = parseInt(match[3] || 0);
+            const isHebrew = lang === 'he';
+            const parts = [];
+            if (days) parts.push(days + ' ' + (isHebrew ? (days === 1 ? 'יום' : 'ימים') : (days === 1 ? 'Day' : 'Days')));
+            if (hours) parts.push(hours + ' ' + (isHebrew ? (hours === 1 ? 'שעה' : 'שעות') : (hours === 1 ? 'Hour' : 'Hours')));
+            if (minutes) parts.push(minutes + ' ' + (isHebrew ? 'דקות' : (minutes === 1 ? 'Minute' : 'Minutes')));
+            return parts.join(isHebrew ? ' ו-' : ' ');
+          };
+
+          const getActiveTimeFromSchema = window => {
+            const lang = (window.document.documentElement && window.document.documentElement.lang) || '';
+            const prepTime = getPropertyFromSchema(window, 'prepTime');
+            if (prepTime && typeof prepTime === 'string') return parseISO8601Duration(prepTime, lang);
+            return '';
+          };
+          const getTotalTimeFromSchema = window => {
+            const lang = (window.document.documentElement && window.document.documentElement.lang) || '';
+            const totalTime = getPropertyFromSchema(window, 'totalTime');
+            if (totalTime && typeof totalTime === 'string') {
+              const parsed = parseISO8601Duration(totalTime, lang);
+              if (parsed) return parsed;
+            }
+            const cookTime = getPropertyFromSchema(window, 'cookTime');
+            if (cookTime && typeof cookTime === 'string') return parseISO8601Duration(cookTime, lang);
+            return '';
+          };
+
           const getLongestTextForQueries = (window, queries) => {
             const vals = queries.map(query => [...window.document.querySelectorAll(query)]).flat().map(el => getInnerText(el));
             return getLongestString(vals);
@@ -502,6 +537,38 @@
           const getTotalTimeFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=totalTime]']);
           const getYieldFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=recipeYield]']);
           const getIngredientsFromMicrodata = window => getLongestTextForQueries(window, ['[itemProp=recipeIngredients]', '[itemProp=ingredients]']);
+
+          // DOM-based label+sibling extractor: finds labeled time fields where label and value are siblings
+          const hebrewTimeLabelMap = [
+            { labels: ['זמן הכנה', 'prep time', 'active time', 'זמן עבודה'], type: 'active' },
+            { labels: ['זמן כולל', 'total time', 'זמן אפייה', 'זמן בישול'], type: 'total' },
+          ];
+          const getTimeFromLabelSibling = (window, type) => {
+            const allElements = Array.from(window.document.querySelectorAll('p, span, div, dt, th, label, strong, b'));
+            const entry = hebrewTimeLabelMap.find(e => e.type === type);
+            if (!entry) return '';
+            for (const el of allElements) {
+              const text = getInnerText(el).trim().toLowerCase();
+              if (el.children.length > 0) continue; // skip containers, only leaf nodes
+              if (!entry.labels.some(lbl => text === lbl.toLowerCase())) continue;
+              // Try next sibling, parent's next sibling, or sibling nodes within same parent
+              const tryEl = el.nextElementSibling ||
+                (el.parentElement && el.parentElement.nextElementSibling);
+              if (tryEl) {
+                const val = getInnerText(tryEl).trim();
+                if (val && val.length > 0 && val.length < 50) return val;
+              }
+              // Also check siblings inside same parent
+              if (el.parentElement) {
+                const siblings = Array.from(el.parentElement.children).filter(c => c !== el);
+                for (const sib of siblings) {
+                  const val = getInnerText(sib).trim();
+                  if (val && val.length > 0 && val.length < 50) return val;
+                }
+              }
+            }
+            return '';
+          };
 
           const grabByHeaderDOM = (config, type) => {
             const headerRegexp = type === 1 ? ingredientSectionHeader : instructionSectionHeader;
@@ -548,8 +615,8 @@
           const clipDescription = config => format.description(getDescriptionFromSchema(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.description));
           const clipSource = config => format.source(grabSourceFromDocumentTitle(config.window) || config.window.location.hostname);
           const clipYield = config => format.yield(getYieldFromSchema(config.window) || getYieldFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.yield) || closestToRegExp(config.window, matchYield).replace('\n', ''));
-          const clipActiveTime = config => format.activeTime(getActiveTimeFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.activeTime) || closestToRegExp(config.window, matchActiveTime).replace('\n', ''));
-          const clipTotalTime = config => format.totalTime(getTotalTimeFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.totalTime) || closestToRegExp(config.window, matchTotalTime).replace('\n', ''));
+          const clipActiveTime = config => format.activeTime(getActiveTimeFromSchema(config.window) || getActiveTimeFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.activeTime) || closestToRegExp(config.window, matchActiveTime).replace('\n', '') || getTimeFromLabelSibling(config.window, 'active'));
+          const clipTotalTime = config => format.totalTime(getTotalTimeFromSchema(config.window) || getTotalTimeFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.totalTime) || closestToRegExp(config.window, matchTotalTime).replace('\n', '') || getTimeFromLabelSibling(config.window, 'total'));
           const clipIngredients = async config => format.ingredients(getIngredientsFromSchema(config.window) || getIngredientsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.ingredients)) || format.ingredients(grabByHeaderDOM(config, 1)) || format.ingredients(await grabByMl(config, 1));
           const clipInstructions = async config => format.instructions(getInstructionsFromSchema(config.window) || getInstructionsFromMicrodata(config.window) || grabLongestMatchByClasses(config.window, ...classMatchers.instructions)) || format.instructions(grabByHeaderDOM(config, 2)) || format.instructions(await grabByMl(config, 2));
           const clipNotes = config => format.notes(grabLongestMatchByClasses(config.window, ...classMatchers.notes));
