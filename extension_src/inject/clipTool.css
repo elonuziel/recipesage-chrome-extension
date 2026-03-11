@@ -47,6 +47,10 @@
   font-family: Arial, Helvetica, sans-serif;
 
   color: black;
+
+  /* Added to prevent the popup from overflowing the screen vertically */
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 @media only screen and (min-width: 1400px) {
