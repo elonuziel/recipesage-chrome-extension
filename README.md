@@ -9,6 +9,10 @@ An extension for clipping recipes to your RecipeSage account.
 - **Enhanced Hebrew Support:** Specialized parsing logic to automatically detect and extract recipe content from Hebrew websites, bypassing English-centric ML limitations.
 - **Clean & Fast:** Highly optimized for performance with smooth UI transitions.
 
+## Installation
+
+grab the latest `.crx` from Releases and drag into a browser tab
+
 ## Installation (Development Mode)
 
 1.  Clone this repository.
