@@ -827,6 +827,27 @@
               currentX = e.clientX - initialX;
               currentY = e.clientY - initialY;
 
+              // Prevent dragging the *grab handle* outside the viewport
+              // The grab handle is on the left side, so we ensure the left edge
+              // of the container stays between 0 and window.innerWidth - 40px (approx handle width).
+              // The top of the container must stay >= 0 and <= window.innerHeight - 40px.
+              const minDragX = -container.offsetLeft;
+              const maxDragX = window.innerWidth - container.offsetLeft - 40;
+              const minDragY = -container.offsetTop;
+              const maxDragY = window.innerHeight - container.offsetTop - 40;
+
+              if (currentX < minDragX) {
+                currentX = minDragX;
+              } else if (currentX > maxDragX) {
+                currentX = maxDragX;
+              }
+
+              if (currentY < minDragY) {
+                currentY = minDragY;
+              } else if (currentY > maxDragY) {
+                currentY = maxDragY;
+              }
+
               xOffset = currentX;
               yOffset = currentY;
 
