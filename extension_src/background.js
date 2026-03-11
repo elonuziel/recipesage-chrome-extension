@@ -15,6 +15,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep the messaging channel open for the async response
   }
 
+  if (request.type === "TRANSLATE_TEXT") {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${request.targetLang}&dt=t&q=${encodeURIComponent(request.text)}`;
+    fetch(url)
+      .then(async (response) => {
+        if (!response.ok) {
+          sendResponse({ success: false, status: response.status });
+          return;
+        }
+        const data = await response.json();
+        let translatedText = "";
+        if (data && data[0]) {
+            data[0].forEach(item => {
+                if (item[0]) translatedText += item[0];
+            });
+        }
+        sendResponse({ success: true, data: { translatedText } });
+      })
+      .catch((error) => {
+        sendResponse({ success: false, error: error.toString() });
+      });
+    return true;
+  }
+
   if (request.type === "FETCH_IMAGEAsObjectUrl" || request.type === "FETCH_IMAGEAsBase64") {
     fetch(request.url)
       .then(async (response) => {

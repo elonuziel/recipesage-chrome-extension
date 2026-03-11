@@ -959,6 +959,13 @@
             );
             createSnipper("Notes", "notes", true, currentSnip.notes);
 
+            let translateBtn = document.createElement("button");
+            translateBtn.innerText = "Translate to Hebrew";
+            translateBtn.onclick = translateRecipe;
+            translateBtn.onmousedown = (e) => e.stopPropagation();
+            translateBtn.className = "translate";
+            container.appendChild(translateBtn);
+
             let save = document.createElement("button");
             save.innerText = "Save";
             save.onclick = submit;
@@ -1103,6 +1110,48 @@
                 destroyAlert();
               }, hideAfter || 6000);
             });
+          };
+
+          let translateRecipe = async (e) => {
+            const btn = e.target;
+            const originalText = btn.innerText;
+            btn.innerText = "Translating...";
+            btn.disabled = true;
+
+            const fieldsToTranslate = ["title", "description", "yield", "activeTime", "totalTime", "ingredients", "instructions", "notes"];
+            
+            for (const field of fieldsToTranslate) {
+              const text = currentSnip[field];
+              if (!text || text.trim().length === 0) continue;
+              
+              try {
+                const response = await new Promise((resolve, reject) => {
+                  chrome.runtime.sendMessage(
+                    { type: "TRANSLATE_TEXT", text: text, targetLang: "he" },
+                    (res) => {
+                      if (res && res.success) {
+                        resolve(res.data);
+                      } else {
+                        reject(new Error(res?.error || "Translation failed"));
+                      }
+                    }
+                  );
+                });
+                
+                if (response && response.translatedText) {
+                    currentSnip[field] = response.translatedText;
+                    if (snippersByField[field] && snippersByField[field].input) {
+                        snippersByField[field].input.value = response.translatedText;
+                    }
+                }
+              } catch (err) {
+                console.error("Failed to translate field:", field, err);
+              }
+            }
+            
+            isDirty = true;
+            btn.innerText = originalText;
+            btn.disabled = false;
           };
 
           let submit = async () => {
